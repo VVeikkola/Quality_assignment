@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import csv
+from datetime import datetime
 from functools import lru_cache
 import json
 import os
@@ -28,6 +29,15 @@ class RepoComparisonTool:
             "Accept": "application/vnd.github.v3+json",
             "Authorization": f"token {self.github_token}",
         }
+        self.log_file = self.output_dir / "analysis.log"
+
+    def log_error(self, message):
+        """Log errors to a file and print to console"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[{timestamp}] ERROR: {message}\n"
+        print(log_entry.strip())
+        with open(self.log_file, "a") as f:
+            f.write(log_entry)
 
     def get_repo_info(self):
         try:
@@ -188,21 +198,13 @@ class RepoComparisonTool:
         {fork_content[:10000]}
         ```
 
-        Return JSON format:
+        Return ONLY valid JSON format:
         {{
-            "similarity_percentage": int, Fgene
+            "similarity_percentage": int,
             "refactoring_level": "none|low|medium|high", 
             "added_features": bool, 
             "removed_features": bool, 
-            "notes": str,
-            "quality_issues": [
-                {{
-                    "issue_type": str,
-                    "severity": "low|medium|high",
-                    "description": str,
-                    "suggestion": str
-                }}
-            ]
+            "notes": str
         }}
         """
         try:
@@ -213,20 +215,22 @@ class RepoComparisonTool:
                 timeout=120 
             )
             output = result.stdout.strip()
-
+            
+            # Clean the output to extract just the JSON part
             json_start = output.find('{')
             json_end = output.rfind('}') + 1
-            if json_start != -1 and json_end != -1:
-                output = output[json_start:json_end]
-            comparison = json.loads(output)
+            if json_start == -1 or json_end == 0:
+                raise ValueError("No JSON found in LLM output")
+                
+            json_str = output[json_start:json_end]
+            comparison = json.loads(json_str)
             
-            # DEDAULT VALUES
+            # Set default values if missing
             comparison.setdefault("similarity_percentage", 0)
             comparison.setdefault("refactoring_level", "unknown")
             comparison.setdefault("added_features", False)
             comparison.setdefault("removed_features", False)
             comparison.setdefault("notes", "No analysis available")
-            comparison.setdefault("quality_issues", [])
             
             return comparison
         except Exception as e:
@@ -236,8 +240,7 @@ class RepoComparisonTool:
                 "refactoring_level": "unknown",
                 "added_features": False,
                 "removed_features": False,
-                "notes": "Error in analysis",
-                "quality_issues": []
+                "notes": f"Error in analysis: {str(e)}"
             }
     
     def llm_code_quality_analysis(self, code: str) -> Dict:
@@ -337,9 +340,133 @@ class RepoComparisonTool:
             json.dump(analysis_results, f, indent=4)
             
         return analysis_results
+    
+    def generate_csv_reports(self, analysis_results, timestamp):
+        csv_dir = self.output_dir / "csv_reports"
+        csv_dir.mkdir(exist_ok=True)
+        
+        main_report_path = csv_dir / f"main_report_{timestamp}.csv"
+        with open(main_report_path, 'w', newline='') as csvfile:
+            fieldnames = [
+                'fork_name', 
+                'fork_url',
+                'files_compared',
+                'avg_similarity',
+                'refactoring_none',
+                'refactoring_low',
+                'refactoring_medium',
+                'refactoring_high'
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for result in analysis_results['comparisons']:
+                writer.writerow({
+                    'fork_name': result['fork'],
+                    'fork_url': result['fork_url'],
+                    'files_compared': result['summary']['files_compared'],
+                    'avg_similarity': result['summary']['average_similarity'],
+                    'refactoring_none': result['summary']['refactoring_distribution']['none'],
+                    'refactoring_low': result['summary']['refactoring_distribution']['low'],
+                    'refactoring_medium': result['summary']['refactoring_distribution']['medium'],
+                    'refactoring_high': result['summary']['refactoring_distribution']['high']
+                })
+        
+        qa_report_path = csv_dir / f"quality_report_{timestamp}.csv"
+        with open(qa_report_path, 'w', newline='') as csvfile:
+            fieldnames = [
+                'fork_name',
+                'files_compared',
+                'avg_similarity',
+                'status',
+                'has_high_refactoring',
+                'has_removed_features'
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for result in analysis_results['comparisons']:
 
+                status = "PASS" if result['summary']['files_compared'] > 0 else "FAIL"
+                has_high_refactoring = result['summary']['refactoring_distribution']['high'] > 0
+                
+                has_removed = any(
+                    file['comparison']['removed_features'] 
+                    for file in result['files']
+                )
+                
+                writer.writerow({
+                    'fork_name': result['fork'],
+                    'files_compared': result['summary']['files_compared'],
+                    'avg_similarity': result['summary']['average_similarity'],
+                    'status': status,
+                    'has_high_refactoring': has_high_refactoring,
+                    'has_removed_features': has_removed
+                })
+        
+        print(f"\nCSV reports generated in {csv_dir}:")
+        print(f"- Main analysis report: {main_report_path}")
+        print(f"- Quality assurance report: {qa_report_path}")
+    
+if __name__ == "__main__":
+    # Initialize tool
+    tool = RepoComparisonTool(GITHUB_TOKEN)
+    
+    # Get repository info
+    repo_info = tool.get_repo_info()
+    if repo_info:
+        print(f"\n=== BASE REPOSITORY ===")
+        print(f"Name: {repo_info['name']}")
+        print(f"Description: {repo_info['description']}")
+        print(f"URL: {repo_info['html_url']}")
+        print(f"Forks: {repo_info['forks_count']}")
+    
+    print("\nFetching forks...")
+    forks = tool.get_forks(max_forks=5)
+    print(f"Found {len(forks)} forks to analyze")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    all_results = {
+        "base_repository": "pallets/click",
+        "analysis_date": timestamp,
+        "forks_analyzed": len(forks),
+        "comparisons": []
+    }
+    
+    for i, fork in enumerate(forks, 1):
+        print(f"\n=== Analyzing fork {i}/{len(forks)}: {fork['full_name']} ===")
+        
+        comparison = tool.compare_repos("pallets/click", fork)
+        all_results["comparisons"].append(comparison)
+        
+        comp_file = tool.output_dir / f"comp_{fork['full_name'].replace('/', '_')}_{timestamp}.json"
+        with open(comp_file, "w") as f:
+            json.dump(comparison, f, indent=2)
+        print(f"Saved comparison to {comp_file}")
+        
+        csv_file = tool.output_dir / f"report_{fork['full_name'].replace('/', '_')}_{timestamp}.csv"
+        with open(csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["File", "Similarity", "Refactoring", "Added Features", "Removed Features", "Notes"])
+            for file in comparison["files"]:
+                comp = file["comparison"]
+                writer.writerow([
+                    file["file_path"],
+                    f"{comp['similarity_percentage']}%",
+                    comp["refactoring_level"],
+                    comp["added_features"],
+                    comp["removed_features"],
+                    comp["notes"]
+                ])
+        print(f"Saved CSV report to {csv_file}")
+    
+    summary_file = tool.output_dir / f"full_analysis_{timestamp}.json"
+    with open(summary_file, "w") as f:
+        json.dump(all_results, f, indent=2)
+    print(f"\nSaved complete analysis to {summary_file}")
+
+""" 
     def main():
-        """Main execution function."""
         if not GITHUB_TOKEN:
             print("Error: GitHub token not found in environment variables")
             return
@@ -365,8 +492,7 @@ class RepoComparisonTool:
 
 if __name__ == "__main__":
     main()
-    
-""" if __name__ == "__main__":
+if __name__ == "__main__":
     tool = RepoComparisonTool(GITHUB_TOKEN)
     repo_info = tool.get_repo_info()
     if repo_info:
