@@ -1,0 +1,11 @@
+File,Similarity,Refactoring,Added Features,Removed Features,Notes
+CHANGES.rst,0%,unknown,False,False,Error in analysis: No JSON found in LLM output
+tox.ini,100%,none,False,False,The provided code files are almost identical with minor whitespace and indentation changes.
+LICENSE.txt,100%,none,False,False,Both code files are identical with no changes made to the license section. The only difference is that one file might have additional or missing content above or below the displayed sections.
+.editorconfig,100%,none,False,False,"Both files have the same structure and content with the exception of indent size for specific file types. The original file sets indent size to 4 for all file types except for the specified ones, where it's set to 2. In the fork version, these settings are reversed."
+README.md,0%,unknown,False,False,Error in analysis: No JSON found in LLM output
+.readthedocs.yaml,100%,none,False,False,The two code files are identical with no changes or additional features added/removed.
+.pre-commit-config.yaml,100%,none,False,False,Both files are identical. No changes or refactoring has been made.
+CONTRIBUTING.rst,0%,unknown,False,False,Error in analysis: No JSON found in LLM output
+pyproject.toml,100%,none,False,False,"The original and forked code files have the same structure, format, and content with minor indentation differences. No new features or functionality appear to be added or removed."
+.gitignore,100%,none,False,False,Both files are identical in terms of structure and content. No apparent changes or additions.
