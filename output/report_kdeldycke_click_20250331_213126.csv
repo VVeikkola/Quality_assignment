@@ -1,0 +1,10 @@
+File,Similarity,Refactoring,Added Features,Removed Features,Notes
+CHANGES.rst,0%,unknown,False,False,Error in analysis: No JSON found in LLM output
+tox.ini,100%,none,False,False,Both code files are identical. No new features have been added or removed.
+LICENSE.txt,100%,none,False,False,Both code files are identical with no additions or removals. They represent a standard software license notice.
+.editorconfig,100%,none,False,False,"Both files have identical semantics. The only difference is that one sets the indent size for certain file types to 2 spaces in the fork version, while it's set to 4 spaces in the original. However, this change doesn't affect the functionality of the code."
+README.md,0%,unknown,False,False,Error in analysis: No JSON found in LLM output
+.readthedocs.yaml,100%,none,False,False,Both code files are identical in terms of structure and content. No features have been added or removed.
+.pre-commit-config.yaml,100%,none,False,False,"The original and forked versions are identical in structure, but the version number of the first repository has been updated from v0.7.1 to v0.8.1."
+pyproject.toml,98%,none,False,False,"The fork version is a slightly modified version of the original with updated version number (from 'dev' to just the version number), and removal of the build number in the dependency list. Otherwise, both files are semantically similar."
+.gitignore,100%,none,False,False,"Both files are identical, no changes have been made in terms of features or structure."

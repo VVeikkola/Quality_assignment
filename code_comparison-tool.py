@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-OLLAMA_MODEL = "mitral"
+OLLAMA_MODEL = "mistral"
 
 
 class RepoComparisonTool:
@@ -155,13 +155,17 @@ class RepoComparisonTool:
                     "file_path": file_path,
                     "comparison": comparison_result
                 })
-
+        total_similarity = -1
+        
         if comparison["files"]:
-            total_similarity = sum(
-                f["comparison"]["similarity_percentage"] 
-                for f in comparison["files"]
-            ) / len(comparison["files"])
-            
+            try:
+                total_similarity = sum(
+                    int(f["comparison"]["similarity_percentage"]) 
+                    for f in comparison["files"]
+                ) / len(comparison["files"])
+            except (ValueError, TypeError, KeyError) as e:
+                print(f"Error processing similarity percentage: {e}")
+                        
             refactoring_levels = [
                 f["comparison"]["refactoring_level"] 
                 for f in comparison["files"]
