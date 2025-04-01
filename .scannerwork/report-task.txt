@@ -1,0 +1,6 @@
+projectKey=repo-comparison-tool
+serverUrl=http://localhost:9000
+serverVersion=25.3.0.104237
+dashboardUrl=http://localhost:9000/dashboard?id=repo-comparison-tool
+ceTaskId=9a34f19e-d625-4c67-b005-8f7d3fe7b3bd
+ceTaskUrl=http://localhost:9000/api/ce/task?id=9a34f19e-d625-4c67-b005-8f7d3fe7b3bd
